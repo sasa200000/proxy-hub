@@ -276,10 +276,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun scanAllChannels() {
         if (_scanProgress.value.isScanning) return
         viewModelScope.launch {
-            val result = repository.scanChannels { progress ->
-                _scanProgress.value = progress
+            try {
+                val result = repository.scanChannels { progress ->
+                    _scanProgress.value = progress
+                }
+                _toastEvent.emit("اسکن انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
+            } catch (e: Exception) {
+                _scanProgress.value = ScanProgress()
+                _toastEvent.emit("خطا در اسکن کانال‌ها: ${e.localizedMessage}")
             }
-            _toastEvent.emit("اسکن انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
         }
     }
 
@@ -313,10 +318,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun fetchFromGitHub() {
         if (_scanProgress.value.isScanning) return
         viewModelScope.launch {
-            val result = repository.fetchFromGitHubSources { progress ->
-                _scanProgress.value = progress
+            try {
+                val result = repository.fetchFromGitHubSources { progress ->
+                    _scanProgress.value = progress
+                }
+                _toastEvent.emit("دریافت از GitHub انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
+            } catch (e: Exception) {
+                _scanProgress.value = ScanProgress()
+                _toastEvent.emit("خطا در دریافت از GitHub: ${e.localizedMessage}")
             }
-            _toastEvent.emit("دریافت از GitHub انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
         }
     }
 
