@@ -111,7 +111,7 @@ fun ShadowmereScreen(
                     Icon(Icons.Default.ArrowBack, contentDescription = "بازگشت", tint = Color.White)
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBgCard)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBgMain)
         )
 
         // Search Bar
@@ -128,8 +128,8 @@ fun ShadowmereScreen(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = CyanPrimary,
                 unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f),
-                focusedContainerColor = DarkBgCard,
-                unfocusedContainerColor = DarkBgCard,
+                focusedContainerColor = DarkBgMain,
+                unfocusedContainerColor = DarkBgMain,
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White
             )
@@ -198,7 +198,7 @@ fun ShadowmereScreen(
                                 }
                             },
                         colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCountry.isEmpty()) CyanPrimary.copy(alpha = 0.2f) else DarkBgCard
+                            containerColor = if (selectedCountry.isEmpty()) CyanPrimary.copy(alpha = 0.2f) else DarkBgMain
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -230,7 +230,7 @@ fun ShadowmereScreen(
                                     proxies = countryProxies
                                 },
                             colors = CardDefaults.cardColors(
-                                containerColor = if (selectedCountry == country) EmeraldAccent.copy(alpha = 0.2f) else DarkBgCard
+                                containerColor = if (selectedCountry == country) EmeraldAccent.copy(alpha = 0.2f) else DarkBgMain
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
