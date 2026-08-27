@@ -1,22 +1,55 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# 🔌 پروکسی هاب و تستر کانفیگ
 
-# Run and deploy your AI Studio app
+ابزار تخصصی دریافت، استخراج، تست سرعت و پینگ، جداسازی و فیلتر کانفیگ‌های V2Ray و پروکسی‌های تلگرام از کانال‌ها با قابلیت حذف خودکار کانفیگ‌های خراب.
 
-This contains everything you need to run your app locally.
+## ✨ امکانات
 
-View your app in AI Studio: https://ai.studio/apps/dca14ef8-0134-44d8-bfe3-d228adc1f63a
+- 📡 دریافت کانفیگ از کانال‌های تلگرام
+- 🔍 استخراج و جداسازی کانفیگ‌های V2Ray
+- ⚡ تست سرعت و پینگ پروکسی‌ها
+- 🗑️ حذف خودکار کانفیگ‌های خراب و غیرفعال
+- 📋 مدیریت و فیلتر پروکسی‌ها
+- 📱 رابط کاربری مدرن با Jetpack Compose
 
-## Run Locally
+## 🛠️ ساخت و اجرا
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+### پیش‌نیازها
 
+- [Android Studio](https://developer.android.com/studio)
+- Android SDK 24+ (minSdk)
+- Android SDK 36 (targetSdk)
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
-7. If you have already published your app in AI Studio, please [request upload key reset](https://support.google.com/googleplay/android-developer/answer/9842756#zippy=%2Crequest-an-upload-key-reset) in Google Play Console.
+### مراحل اجرا
+
+1. پروژه را در Android Studio باز کنید
+2. یک فایل `.env` در ریشه پروژه بسازید و کلید API جمینای را قرار دهید:
+
+```bash
+GEMINI_API_KEY=your_api_key_here
+```
+
+3. خط `signingConfig = signingConfigs.getByName("debugConfig")` را از فایل `app/build.gradle.kts` حذف کنید
+4. پروژه را روی ایمولاتور یا دستگاه فیزیکی اجرا کنید
+
+## 🏗️ ساختار پروژه
+
+```
+app/src/main/java/com/example/
+├── data/
+│   ├── model/Entities.kt        # مدل‌های داده
+│   ├── db/AppDatabase.kt        # پایگاه داده Room
+│   ├── parser/ConfigParser.kt   # پارسر کانفیگ‌ها
+│   ├── fetcher/ChannelFetcher.kt # دریافت از کانال‌ها
+│   ├── tester/PingTester.kt     # تست پینگ
+│   └── repository/ProxyRepository.kt
+├── ui/
+│   ├── screens/                 # صفحات اپلیکیشن
+│   ├── components/              # کامپوننت‌های مشترک
+│   ├── viewmodel/               # ViewModel
+│   └── theme/                   # تم و رنگ‌ها
+└── MainActivity.kt              # فعالیت اصلی
+```
+
+## 📄 لایسنس
+
+MIT License
