@@ -37,36 +37,60 @@ class ProxyRepository(private val db: AppDatabase) {
      */
     suspend fun initDefaultChannelsIfNeeded() = withContext(Dispatchers.IO) {
         val defaultChannels = listOf(
-            ChannelEntity(
-                username = "v2rayng_org",
-                title = "V2Ray Configs Hub",
-                description = "کانفیگ‌های فعال V2Ray، VLESS، VMess و Trojan",
-                isEnabled = true
-            ),
-            ChannelEntity(
-                username = "ProxyMTProto",
-                title = "MTProto Proxies",
-                description = "پروکسی‌های پرسرعت و فعال تلگرام ضد فیلتر",
-                isEnabled = true
-            ),
-            ChannelEntity(
-                username = "FalconProxy",
-                title = "Falcon Telegram Proxy",
-                description = "پروکسی‌های پینگ پایین و اختصاصی تلگرام",
-                isEnabled = true
-            ),
-            ChannelEntity(
-                username = "v2ray_configs_pool",
-                title = "V2Ray Configs Pool",
-                description = "کانفیگ‌های روزانه و تست شده vless/vmess",
-                isEnabled = true
-            ),
-            ChannelEntity(
-                username = "FreeV2rays",
-                title = "Free V2Ray Channel",
-                description = "سرورهای رایگان با اتصال مستقیم و کلودفلر",
-                isEnabled = false
-            )
+            ChannelEntity(username = "dicodeir", title = "Dicode IR", description = "کانفیگ و پروکسی", isEnabled = true),
+            ChannelEntity(username = "persianvpnhub", title = "Persian VPN Hub", description = "هاب VPN فارسی", isEnabled = true),
+            ChannelEntity(username = "Free_MTProto_Proxy", title = "Free MTProto Proxy", description = "پروکسی‌های رایگان MTProto", isEnabled = true),
+            ChannelEntity(username = "proxyir01", title = "Proxy IR", description = "پروکسی‌های ایرانی", isEnabled = true),
+            ChannelEntity(username = "Spotify_Porteghali", title = "Spotify Porteghali", description = "اسپاتیفای پرتقالی", isEnabled = true),
+            ChannelEntity(username = "lightning6", title = "Lightning6", description = "کانفیگ‌های لایتنینگ", isEnabled = true),
+            ChannelEntity(username = "shaxhabb", title = "Shaxhabb", description = "کانفیگ و پروکسی", isEnabled = true),
+            ChannelEntity(username = "meliproxyy", title = "Meli Proxy", description = "پروکسی ملی", isEnabled = true),
+            ChannelEntity(username = "ProxyMTProto", title = "Proxy MTProto", description = "پروکسی‌های MTProto تلگرام", isEnabled = true),
+            ChannelEntity(username = "LonUp_M", title = "LonUp M", description = "کانفیگ‌های LonUp", isEnabled = true),
+            ChannelEntity(username = "sorenab2", title = "Sorena B2", description = "سرونا بی2", isEnabled = true),
+            ChannelEntity(username = "ProxyDaemi", title = "Proxy Daemi", description = "پروکسی دایمی", isEnabled = true),
+            ChannelEntity(username = "iMTProto", title = "iMTProto", description = "پروکسی‌های iMTProto", isEnabled = true),
+            ChannelEntity(username = "v2rayngvpn", title = "V2RayNG VPN", description = "کانفیگ‌های V2RayNG", isEnabled = true),
+            ChannelEntity(username = "ConfigX2ray", title = "Config X2ray", description = "کانفیگ‌های X2ray", isEnabled = true),
+            ChannelEntity(username = "IraneAzad_Net", title = "Irane Azad Net", description = "ایران آزاد نت", isEnabled = true),
+            ChannelEntity(username = "prrofile_purple", title = "Profile Purple", description = "پروفایل بنفش", isEnabled = true),
+            ChannelEntity(username = "V2WRAY", title = "V2WRAY", description = "کانفیگ‌های V2WRAY", isEnabled = true),
+            ChannelEntity(username = "TelMTProto", title = "Tel MTProto", description = "پروکسی تل MTProto", isEnabled = true),
+            ChannelEntity(username = "v2ryNG01", title = "V2RayNG 01", description = "کانفیگ‌های V2RayNG", isEnabled = true),
+            ChannelEntity(username = "V2ray_official", title = "V2Ray Official", description = "کانفیگ‌های رسمی V2Ray", isEnabled = true),
+            ChannelEntity(username = "TheAnilad", title = "The Anilad", description = "کانفیگ و پروکسی", isEnabled = true),
+            ChannelEntity(username = "ProxyDotNet", title = "Proxy DotNet", description = "پروکسی دات‌نت", isEnabled = true),
+            ChannelEntity(username = "NPROXY", title = "NPROXY", description = "پروکسی‌های N", isEnabled = true),
+            ChannelEntity(username = "mrsoulb", title = "MrSoulb", description = "کانفیگ و پروکسی", isEnabled = true),
+            ChannelEntity(username = "ConfigsHUB", title = "Configs HUB", description = "هاب کانفیگ‌ها", isEnabled = true),
+            ChannelEntity(username = "orange_vpns", title = "Orange VPNs", description = "وی‌پی‌ان‌های نارنجی", isEnabled = true),
+            ChannelEntity(username = "BugFreeNet", title = "Bug Free Net", description = "نت بدون باگ", isEnabled = true),
+            ChannelEntity(username = "TeleProxyTele", title = "Tele Proxy Tele", description = "پروکسی تلگرام", isEnabled = true),
+            ChannelEntity(username = "iproxy_Meli", title = "iProxy Meli", description = "آی‌پروکسی ملی", isEnabled = true),
+            ChannelEntity(username = "SimChin_ir", title = "SimChin IR", description = "سیم‌چین ایران", isEnabled = true),
+            ChannelEntity(username = "V2rayEnglish", title = "V2Ray English", description = "کانفیگ‌های انگلیسی V2Ray", isEnabled = true),
+            ChannelEntity(username = "v2nova8", title = "V2Nova 8", description = "کانفیگ‌های V2Nova", isEnabled = true),
+            ChannelEntity(username = "NetAccount", title = "Net Account", description = "نت اکانت", isEnabled = true),
+            ChannelEntity(username = "qpshow", title = "QP Show", description = "کیو‌پی شو", isEnabled = true),
+            ChannelEntity(username = "DarkHub_VPN", title = "DarkHub VPN", description = "دارک‌هاب VPN", isEnabled = true),
+            ChannelEntity(username = "configmax", title = "Config Max", description = "حداکثر کانفیگ", isEnabled = true),
+            ChannelEntity(username = "nufilter", title = "Nu Filter", description = "نو فیلتر", isEnabled = true),
+            ChannelEntity(username = "V2RAY_SPATIAL", title = "V2RAY Spatial", description = "فضای V2RAY", isEnabled = true),
+            ChannelEntity(username = "shankamil", title = "Shankamil", description = "شانکامیل", isEnabled = true),
+            ChannelEntity(username = "PulseStore_ir", title = "PulseStore IR", description = "پالس استور ایران", isEnabled = true),
+            ChannelEntity(username = "NETMelliAnti", title = "NET Melli Anti", description = "نت ملی آنتی", isEnabled = true),
+            ChannelEntity(username = "Blue_star_Vip", title = "Blue Star VIP", description = "ستاره آبی VIP", isEnabled = true),
+            ChannelEntity(username = "Maznet", title = "Maznet", description = "مزنیت", isEnabled = true),
+            ChannelEntity(username = "cpy_teeL", title = "CPY TeeL", description = "سی‌پی‌وای تیل", isEnabled = true),
+            ChannelEntity(username = "beshcan", title = "Beshcan", description = "بش‌کن", isEnabled = true),
+            ChannelEntity(username = "Parsashonam", title = "Parsashonam", description = "پرستشونام", isEnabled = true),
+            ChannelEntity(username = "ProxySnipe", title = "Proxy Snipe", description = "پروکسی اسنایپ", isEnabled = true),
+            ChannelEntity(username = "Merlin_ViP", title = "Merlin VIP", description = "مرلین VIP", isEnabled = true),
+            ChannelEntity(username = "ghalagyann", title = "Ghalagyann", description = "قلعه‌یان", isEnabled = true),
+            ChannelEntity(username = "Free_Nettm", title = "Free Net TM", description = "نت رایگان TM", isEnabled = true),
+            ChannelEntity(username = "EzAccess1", title = "Ez Access", description = "دسترسی آسان", isEnabled = true),
+            ChannelEntity(username = "ChinaPortGFW", title = "China Port GFW", description = "پورت چین GFW", isEnabled = true),
+            ChannelEntity(username = "filshekan_vip", title = "Fil Shekan VIP", description = "فیل‌شکن VIP", isEnabled = true)
         )
         db.channelDao().insertChannels(defaultChannels)
     }
