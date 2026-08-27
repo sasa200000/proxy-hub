@@ -77,7 +77,7 @@ object PingTester {
             }
 
             //延安 Send proxy secret
-            val proxyTag = byteArrayOf(0xef.toByte(), 0xef.toByte(), 0.ef.toByte(), 0xef.toByte())
+            val proxyTag = byteArrayOf(0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte())
             output.write(proxyTag)
 
             // Length of secret (16 bytes)
