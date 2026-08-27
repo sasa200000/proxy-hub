@@ -7,16 +7,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 object ChannelFetcher {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val client: OkHttpClient = run {
+        // Trust all certificates to work with VPN/proxy SSL interception
+        val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        })
+
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(null, trustAllCerts, SecureRandom())
+
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            .hostnameVerifier { _, _ -> true }
+            .build()
+    }
 
     data class FetchResult(
         val username: String,
@@ -73,53 +94,66 @@ object ChannelFetcher {
             )
         }
 
-        val url = "https://t.me/s/$username"
-        try {
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                .header("Accept-Language", "en-US,en;q=0.9,fa;q=0.8")
-                .build()
+        // Try multiple URLs with retry logic
+        val urls = listOf(
+            "https://t.me/s/$username",
+            "https://t.me/$username"
+        )
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
+        var lastError: String? = null
+
+        for (url in urls) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                    .header("Accept-Language", "en-US,en;q=0.9,fa;q=0.8")
+                    .header("Accept-Encoding", "identity")
+                    .header("Connection", "keep-alive")
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        lastError = "خطای دریافت: کد ${response.code}"
+                        continue
+                    }
+
+                    val html = response.body?.string() ?: ""
+                    if (html.isBlank()) {
+                        lastError = "پاسخ خالی از سرور"
+                        continue
+                    }
+
+                    val title = extractTitle(html).ifBlank { "@$username" }
+                    val description = extractDescription(html)
+
+                    val parseResult = ConfigParser.extractAll(html, sourceChannel = username)
+
                     return@withContext FetchResult(
                         username = username,
-                        title = "@$username",
-                        description = "",
-                        configs = emptyList(),
-                        proxies = emptyList(),
-                        isSuccess = false,
-                        error = "خطای دریافت: کد ${response.code}"
+                        title = title,
+                        description = description,
+                        configs = parseResult.configs,
+                        proxies = parseResult.proxies,
+                        isSuccess = true
                     )
                 }
-
-                val html = response.body?.string() ?: ""
-                val title = extractTitle(html).ifBlank { "@$username" }
-                val description = extractDescription(html)
-
-                val parseResult = ConfigParser.extractAll(html, sourceChannel = username)
-
-                FetchResult(
-                    username = username,
-                    title = title,
-                    description = description,
-                    configs = parseResult.configs,
-                    proxies = parseResult.proxies,
-                    isSuccess = true
-                )
+            } catch (e: Exception) {
+                lastError = e.localizedMessage ?: "خطای اتصال به شبکه"
+                continue
             }
-        } catch (e: Exception) {
-            FetchResult(
-                username = username,
-                title = "@$username",
-                description = "",
-                configs = emptyList(),
-                proxies = emptyList(),
-                isSuccess = false,
-                error = e.localizedMessage ?: "خطای اتصال به شبکه"
-            )
         }
+
+        FetchResult(
+            username = username,
+            title = "@$username",
+            description = "",
+            configs = emptyList(),
+            proxies = emptyList(),
+            isSuccess = false,
+            error = lastError ?: "خطای ناشناخته"
+        )
     }
 
     private suspend fun fetchDirectUrl(url: String): FetchResult = withContext(Dispatchers.IO) {
@@ -127,6 +161,8 @@ object ChannelFetcher {
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "v2rayNG/1.8.19")
+                .header("Accept", "*/*")
+                .header("Connection", "keep-alive")
                 .build()
 
             client.newCall(request).execute().use { response ->
