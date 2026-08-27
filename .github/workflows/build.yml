@@ -35,10 +35,19 @@ jobs:
           -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
           -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
 
+    - name: Generate release keystore
+      run: |
+        keytool -genkey -v -keystore my-upload-key.jks -storepass upload123 \
+          -alias upload -keypass upload123 -keyalg RSA -keysize 2048 \
+          -validity 10000 -dname "CN=ProxyHub,OU=Dev,O=ProxyHub,L=Unknown,ST=Unknown,C=IR"
+
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon
 
     - name: Build Release APK
+      env:
+        STORE_PASSWORD: upload123
+        KEY_PASSWORD: upload123
       run: ./gradlew assembleRelease --no-daemon
 
     - name: Find APK files
