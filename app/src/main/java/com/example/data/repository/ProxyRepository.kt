@@ -274,7 +274,11 @@ class ProxyRepository(private val db: AppDatabase) {
 
     // Proxies operations
     suspend fun testSingleProxy(proxy: ProxyEntity, timeoutMs: Int = 2500): ProxyEntity = withContext(Dispatchers.IO) {
-        val ping = PingTester.testTcpPing(proxy.server, proxy.port, timeoutMs)
+        val ping = if (proxy.type == com.example.data.model.ProxyType.MTPROTO && !proxy.secret.isNullOrBlank()) {
+            PingTester.testMtprotoProxy(proxy.server, proxy.port, proxy.secret, timeoutMs)
+        } else {
+            PingTester.testTcpPing(proxy.server, proxy.port, timeoutMs)
+        }
         val now = System.currentTimeMillis()
         db.proxyDao().updatePing(proxy.id, ping.pingMs, ping.isAlive, now)
         proxy.copy(pingMs = ping.pingMs, isAlive = ping.isAlive, lastTestedAt = now)
@@ -308,7 +312,11 @@ class ProxyRepository(private val db: AppDatabase) {
             val tasks = proxies.map { proxy ->
                 async {
                     semaphore.withPermit {
-                        val result = PingTester.testTcpPing(proxy.server, proxy.port, timeoutMs)
+                        val result = if (proxy.type == com.example.data.model.ProxyType.MTPROTO && !proxy.secret.isNullOrBlank()) {
+                            PingTester.testMtprotoProxy(proxy.server, proxy.port, proxy.secret, timeoutMs)
+                        } else {
+                            PingTester.testTcpPing(proxy.server, proxy.port, timeoutMs)
+                        }
                         val now = System.currentTimeMillis()
                         db.proxyDao().updatePing(proxy.id, result.pingMs, result.isAlive, now)
 
