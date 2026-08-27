@@ -9,8 +9,7 @@ import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketAddress
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
@@ -29,8 +28,8 @@ object PingTester {
     )
 
     /**
-     * Tests TCP connectivity and latency (in milliseconds) to target host:port.
-     * Uses proxy if configured.
+     * Tests TCP connectivity and latency.
+     * For port 443, also tries TLS handshake to verify the server is truly reachable.
      */
     suspend fun testTcpPing(
         host: String,
@@ -46,18 +45,46 @@ object PingTester {
             val startTime = System.nanoTime()
 
             val cfg = proxyConfig
-            if (cfg != null && cfg.enabled && cfg.host.isNotBlank()) {
-                // Connect through proxy
-                socket = connectThroughProxy(cfg, host, port, timeoutMs)
+            socket = if (cfg != null && cfg.enabled && cfg.host.isNotBlank()) {
+                connectThroughProxy(cfg, host, port, timeoutMs)
             } else {
-                // Direct connection
-                socket = Socket()
-                socket.soTimeout = timeoutMs
-                socket.connect(InetSocketAddress(host, port), timeoutMs)
+                val s = Socket()
+                s.soTimeout = timeoutMs
+                s.connect(InetSocketAddress(host, port), timeoutMs)
+                s
             }
 
-            val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
+            val elapsedTcp = (System.nanoTime() - startTime) / 1_000_000
 
+            // If port 443, try TLS handshake for more accurate result
+            if (port == 443 && socket.isConnected) {
+                try {
+                    val trustAll = arrayOf<TrustManager>(object : X509TrustManager {
+                        override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                        override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                        override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+                    })
+                    val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
+                    sslContext.init(null, trustAll, java.security.SecureRandom())
+
+                    val factory = sslContext.socketFactory as SSLSocketFactory
+                    val tlsStartTime = System.nanoTime()
+                    val sslSocket = factory.createSocket(socket, host, port) as SSLSocket
+                    sslSocket.soTimeout = timeoutMs
+                    sslSocket.startHandshake()
+                    val elapsedTls = (System.nanoTime() - tlsStartTime) / 1_000_000
+                    sslSocket.close()
+
+                    return@withContext PingResult(
+                        isAlive = true,
+                        pingMs = if (elapsedTls <= 0) 1 else elapsedTls
+                    )
+                } catch (_: Exception) {
+                    // TLS failed but TCP worked - still alive but slower
+                }
+            }
+
+            val elapsedMs = elapsedTcp
             PingResult(
                 isAlive = true,
                 pingMs = if (elapsedMs <= 0) 1 else elapsedMs
@@ -68,9 +95,7 @@ object PingTester {
                 pingMs = -2
             )
         } finally {
-            try {
-                socket?.close()
-            } catch (_: Exception) {}
+            try { socket?.close() } catch (_: Exception) {}
         }
     }
 
@@ -94,40 +119,34 @@ object PingTester {
     ): Socket {
         val socket = Socket()
         socket.soTimeout = timeoutMs
-
-        // Connect to SOCKS5 proxy
         socket.connect(InetSocketAddress(config.host, config.port), timeoutMs)
         val output = socket.getOutputStream()
         val input = socket.getInputStream()
 
-        // SOCKS5 handshake: version 5, no auth
         output.write(byteArrayOf(0x05, 0x01, 0x00))
         output.flush()
 
-        // Read server response
         val response = ByteArray(2)
         readFull(input, response)
 
         if (response[0] != 0x05.toByte()) {
             socket.close()
-            throw Exception("SOCKS5 handshake failed: version ${response[0]}")
+            throw Exception("SOCKS5 handshake failed")
         }
 
         if (response[1] != 0x00.toByte()) {
-            // Try with auth
             output.write(byteArrayOf(0x05, 0x01, 0x02))
             output.flush()
             val authResp = ByteArray(2)
             readFull(input, authResp)
             if (authResp[1] != 0x02.toByte()) {
                 socket.close()
-                throw Exception("SOCKS5 auth required but no credentials provided")
+                throw Exception("SOCKS5 auth required")
             }
-            // Username/Password auth (RFC 1929)
             val username = config.username.toByteArray()
             val password = config.password.toByteArray()
             val authMsg = ByteArray(3 + username.size + 1 + password.size)
-            authMsg[0] = 0x01 // Version
+            authMsg[0] = 0x01
             authMsg[1] = username.size.toByte()
             System.arraycopy(username, 0, authMsg, 2, username.size)
             authMsg[2 + username.size] = password.size.toByte()
@@ -138,17 +157,16 @@ object PingTester {
             readFull(input, authResult)
             if (authResult[1] != 0x00.toByte()) {
                 socket.close()
-                throw Exception("SOCKS5 authentication failed")
+                throw Exception("SOCKS5 auth failed")
             }
         }
 
-        // SOCKS5 connect request: version 5, connect command, reserved, domain type
         val hostBytes = targetHost.toByteArray()
         val connectReq = ByteArray(7 + hostBytes.size)
-        connectReq[0] = 0x05 // Version
-        connectReq[1] = 0x01 // Connect command
-        connectReq[2] = 0x00 // Reserved
-        connectReq[3] = 0x03 // Domain name type
+        connectReq[0] = 0x05
+        connectReq[1] = 0x01
+        connectReq[2] = 0x00
+        connectReq[3] = 0x03
         connectReq[4] = hostBytes.size.toByte()
         System.arraycopy(hostBytes, 0, connectReq, 5, hostBytes.size)
         connectReq[5 + hostBytes.size] = ((targetPort shr 8) and 0xFF).toByte()
@@ -156,24 +174,12 @@ object PingTester {
         output.write(connectReq)
         output.flush()
 
-        // Read connect response
         val connectResp = ByteArray(10)
         readFull(input, connectResp)
 
         if (connectResp[1] != 0x00.toByte()) {
             socket.close()
-            val error = when (connectResp[1].toInt() and 0xFF) {
-                0x01 -> "General SOCKS server failure"
-                0x02 -> "Connection not allowed by ruleset"
-                0x03 -> "Network unreachable"
-                0x04 -> "Host unreachable"
-                0x05 -> "Connection refused"
-                0x06 -> "TTL expired"
-                0x07 -> "Command not supported"
-                0x08 -> "Address type not supported"
-                else -> "Unknown error ${connectResp[1]}"
-            }
-            throw Exception("SOCKS5 connect failed: $error")
+            throw Exception("SOCKS5 connect failed: ${connectResp[1]}")
         }
 
         return socket
@@ -192,21 +198,18 @@ object PingTester {
         val output = socket.getOutputStream()
         val input = socket.getInputStream()
 
-        // HTTP CONNECT
         val connectRequest = "CONNECT $targetHost:$targetPort HTTP/1.1\r\nHost: $targetHost:$targetPort\r\n\r\n"
         output.write(connectRequest.toByteArray())
         output.flush()
 
-        // Read response
         val reader = BufferedReader(InputStreamReader(input))
-        val statusLine = reader.readLine() ?: throw Exception("HTTP CONNECT failed: no response")
+        val statusLine = reader.readLine() ?: throw Exception("HTTP CONNECT failed")
 
         if (!statusLine.contains("200")) {
             socket.close()
             throw Exception("HTTP CONNECT failed: $statusLine")
         }
 
-        // Skip remaining headers
         var line = reader.readLine()
         while (line != null && line.isNotEmpty()) {
             line = reader.readLine()
@@ -219,7 +222,7 @@ object PingTester {
         var offset = 0
         while (offset < buffer.size) {
             val read = input.read(buffer, offset, buffer.size - offset)
-            if (read == -1) throw java.io.EOFException("Connection closed during SOCKS5 handshake")
+            if (read == -1) throw java.io.EOFException("Connection closed")
             offset += read
         }
     }
