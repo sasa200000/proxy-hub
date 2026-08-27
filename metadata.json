@@ -1,0 +1,6 @@
+{
+  "name": "پروکسی هاب و تستر کانفیگ",
+  "description": "ابزار تخصصی دریافت، استخراج، تست سرعت و پینگ، جداسازی و فیلتر کانفیگ‌های V2Ray و پروکسی‌های تلگرام از کانال‌ها با قابلیت حذف خودکار کانفیگ‌های خراب",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
