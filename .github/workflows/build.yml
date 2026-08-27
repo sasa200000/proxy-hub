@@ -1,0 +1,82 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon
+
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+
+    - name: Find APK files
+      run: |
+        echo "=== Debug APK ==="
+        find app/build/outputs/apk -name "*.apk" -type f 2>/dev/null || echo "No debug APK found"
+        echo "=== Release APK ==="
+        find app/build/outputs/apk -name "*.apk" -type f 2>/dev/null || echo "No release APK found"
+
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProxyHub-debug
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: warn
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProxyHub-release
+        path: app/build/outputs/apk/release/*.apk
+        if-no-files-found: warn
+
+    - name: Create Release and Upload APK
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v1.0.0
+        name: "پروکسی هاب v1.0.0"
+        body: |
+          ## 🔌 پروکسی هاب و تستر کانفیگ v1.0.0
+          
+          ابزار تخصصی دریافت، استخراج، تست سرعت و پینگ، جداسازی و فیلتر کانفیگ‌های V2Ray و پروکسی‌های تلگرام از کانال‌ها.
+          
+          ### امکانات
+          - 📡 دریافت کانفیگ از کانال‌های تلگرام
+          - 🔍 استخراج و جداسازی کانفیگ‌های V2Ray
+          - ⚡ تست سرعت و پینگ پروکسی‌ها
+          - 🗑️ حذف خودکار کانفیگ‌های خراب
+          - 📋 مدیریت و فیلتر پروکسی‌ها
+          - 📱 رابط کاربری مدرن با Jetpack Compose
+          
+          ### نصب
+          فایل APK را دانلود و روی دستگاه اندرویدی خود نصب کنید.
+        files: |
+          app/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/release/*.apk
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
