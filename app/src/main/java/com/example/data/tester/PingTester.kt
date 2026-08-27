@@ -2,7 +2,6 @@ package com.example.data.tester
 
 import com.example.data.model.ProxyConfig
 import com.example.data.model.ProxyProtocol
-import com.example.data.model.ProxyType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -32,8 +31,9 @@ object PingTester {
      * تست واقعی پروکسی MTProto:
      * 1. TCP connect
      * 2. ارسال secret
-     * 3. دریافت پاسخ handshake
-     * این تست واقعاً چک می‌کنه آیا پروکسی کار می‌کنه یا نه
+     * 3. بررسی پاسخ سرور
+     * 4. اگر سرور connection رو بست = پروکسی خرابه
+     * 5. اگر سرور داده برگردوند = پروکسی کار می‌کنه
      */
     suspend fun testMtprotoProxy(
         host: String,
@@ -59,8 +59,6 @@ object PingTester {
                 s
             }
 
-            val elapsedTcp = (System.nanoTime() - startTime) / 1_000_000
-
             if (!socket.isConnected) {
                 return@withContext PingResult(isAlive = false, pingMs = -2)
             }
@@ -69,61 +67,95 @@ object PingTester {
             val input = socket.getInputStream()
 
             // MTProto proxy protocol:
-            // Client sends: 0xefefefef + 4 bytes length + encrypted延安secret
+            // Tag: 0xefefefef (4 bytes)
+            // Secret length: 4 bytes big-endian
+            // Secret: 16 bytes
             val secretBytes = hexStringToByteArray(secret)
             if (secretBytes.size < 16) {
                 socket.close()
                 return@withContext PingResult(isAlive = false, pingMs = -2)
             }
 
-            //延安 Send proxy secret
-            val proxyTag = byteArrayOf(0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte())
-            output.write(proxyTag)
+            // Send tag
+            output.write(byteArrayOf(0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte(), 0xEF.toByte()))
 
-            // Length of secret (16 bytes)
-            val lenBytes = intToBytes(16)
-            output.write(lenBytes)
+            // Send length (16 bytes)
+            output.write(byteArrayOf(0x00, 0x00, 0x00, 0x10))
 
-            // Send the secret
-            output.write(secretBytes)
+            // Send secret
+            output.write(secretBytes.copyOf(16))
             output.flush()
 
-            // Wait for response
-            Thread.sleep(500)
+            // Wait for server response
+            val buffer = ByteArray(2048)
+            var totalRead = 0
+            var responseTime = 0L
 
-            // Check if we got any response (server didn't close connection)
-            val available = input.available()
-            val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
+            try {
+                // Wait a bit for response
+                Thread.sleep(1000)
 
-            // If connection is still alive and we got data, proxy is working
-            if (socket.isConnected && !socket.isClosed) {
-                // Try to read response
-                val buffer = ByteArray(1024)
+                val available = input.available()
+                if (available > 0) {
+                    val read = input.read(buffer)
+                    totalRead = read
+                    responseTime = (System.nanoTime() - startTime) / 1_000_000
+
+                    if (read > 0 && !socket.isClosed) {
+                        // Got response = proxy is alive and accepted secret
+                        return@withContext PingResult(
+                            isAlive = true,
+                            pingMs = if (responseTime <= 0) 1 else responseTime
+                        )
+                    }
+                }
+
+                // Check if connection is still alive after sending secret
+                // Try to read more data (with short timeout)
                 try {
-                    if (available > 0) {
-                        val read = input.read(buffer)
-                        if (read > 0) {
-                            // Got response from proxy - it's alive and responding
+                    Thread.sleep(500)
+                    val available2 = input.available()
+                    if (available2 > 0) {
+                        val read2 = input.read(buffer)
+                        responseTime = (System.nanoTime() - startTime) / 1_000_000
+                        if (read2 > 0) {
                             return@withContext PingResult(
                                 isAlive = true,
-                                pingMs = if (elapsedMs <= 0) 1 else elapsedMs
+                                pingMs = if (responseTime <= 0) 1 else responseTime
                             )
                         }
                     }
-                    // Even without response, if connection stays alive, proxy is working
+                } catch (_: Exception) {}
+
+                responseTime = (System.nanoTime() - startTime) / 1_000_000
+
+                // If connection is still open, proxy might be working
+                // But if server didn't respond at all, it's suspicious
+                if (!socket.isClosed && socket.isConnected) {
+                    // Server didn't close connection = proxy might be alive
+                    // But no response = likely dead/expired
                     return@withContext PingResult(
-                        isAlive = true,
-                        pingMs = if (elapsedMs <= 0) 1 else elapsedMs
-                    )
-                } catch (e: Exception) {
-                    // Read failed but connection was alive
-                    return@withContext PingResult(
-                        isAlive = true,
-                        pingMs = if (elapsedMs <= 0) 1 else elapsedMs
+                        isAlive = false,
+                        pingMs = -2
                     )
                 }
+
+                PingResult(isAlive = false, pingMs = -2)
+
+            } catch (e: java.net.SocketTimeoutException) {
+                // Timeout on read = server didn't respond = proxy dead
+                val elapsedMs = (System.nanoTime() - startTime) / 1_000_000
+                PingResult(isAlive = false, pingMs = -2)
+            } catch (e: java.io.EOFException) {
+                // Server closed connection = proxy dead
+                PingResult(isAlive = false, pingMs = -2)
+            } catch (e: Exception) {
+                // Connection reset/closed = proxy dead
+                PingResult(isAlive = false, pingMs = -2)
             }
 
+        } catch (e: java.net.ConnectException) {
+            // Connection refused = server is not accepting connections
             PingResult(isAlive = false, pingMs = -2)
         } catch (e: Exception) {
             PingResult(isAlive = false, pingMs = -2)
@@ -183,9 +215,7 @@ object PingTester {
                         isAlive = true,
                         pingMs = if (elapsedTls <= 0) 1 else elapsedTls
                     )
-                } catch (_: Exception) {
-                    // TLS failed but TCP worked - still alive
-                }
+                } catch (_: Exception) {}
             }
 
             PingResult(
@@ -199,24 +229,14 @@ object PingTester {
         }
     }
 
-    private fun connectThroughProxy(
-        config: ProxyConfig,
-        targetHost: String,
-        targetPort: Int,
-        timeoutMs: Int
-    ): Socket {
+    private fun connectThroughProxy(config: ProxyConfig, targetHost: String, targetPort: Int, timeoutMs: Int): Socket {
         return when (config.type) {
             ProxyProtocol.SOCKS5 -> connectSocks5(config, targetHost, targetPort, timeoutMs)
             ProxyProtocol.HTTP, ProxyProtocol.HTTPS -> connectHttp(config, targetHost, targetPort, timeoutMs)
         }
     }
 
-    private fun connectSocks5(
-        config: ProxyConfig,
-        targetHost: String,
-        targetPort: Int,
-        timeoutMs: Int
-    ): Socket {
+    private fun connectSocks5(config: ProxyConfig, targetHost: String, targetPort: Int, timeoutMs: Int): Socket {
         val socket = Socket()
         socket.soTimeout = timeoutMs
         socket.connect(InetSocketAddress(config.host, config.port), timeoutMs)
@@ -285,12 +305,7 @@ object PingTester {
         return socket
     }
 
-    private fun connectHttp(
-        config: ProxyConfig,
-        targetHost: String,
-        targetPort: Int,
-        timeoutMs: Int
-    ): Socket {
+    private fun connectHttp(config: ProxyConfig, targetHost: String, targetPort: Int, timeoutMs: Int): Socket {
         val socket = Socket()
         socket.soTimeout = timeoutMs
         socket.connect(InetSocketAddress(config.host, config.port), timeoutMs)
@@ -328,22 +343,14 @@ object PingTester {
     }
 
     private fun hexStringToByteArray(s: String): ByteArray {
-        val len = s.length
+        val clean = s.removePrefix("dd")
+        val len = clean.length
         val data = ByteArray(len / 2)
         var i = 0
         while (i < len) {
-            data[i / 2] = ((Character.digit(s[i], 16) shl 4) + Character.digit(s[i + 1], 16)).toByte()
+            data[i / 2] = ((Character.digit(clean[i], 16) shl 4) + Character.digit(clean[i + 1], 16)).toByte()
             i += 2
         }
         return data
-    }
-
-    private fun intToBytes(value: Int): ByteArray {
-        return byteArrayOf(
-            ((value shr 24) and 0xFF).toByte(),
-            ((value shr 16) and 0xFF).toByte(),
-            ((value shr 8) and 0xFF).toByte(),
-            (value and 0xFF).toByte()
-        )
     }
 }
