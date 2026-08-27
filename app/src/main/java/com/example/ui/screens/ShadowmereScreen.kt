@@ -1,26 +1,19 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -30,7 +23,6 @@ import com.example.data.fetcher.ShadowmereFetcher
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 
-// Country flags mapping
 private val COUNTRY_FLAGS = mapOf(
     "US" to "🇺🇸", "GB" to "🇬🇧", "DE" to "🇩🇪", "FR" to "🇫🇷", "NL" to "🇳🇱",
     "CA" to "🇨🇦", "JP" to "🇯🇵", "SG" to "🇸🇬", "HK" to "🇭🇰", "KR" to "🇰🇷",
@@ -55,33 +47,33 @@ fun ShadowmereScreen(
     onBack: () -> Unit,
     onFetchProxies: (String) -> Unit
 ) {
-    var proxies by remember { mutableStateOf<List<ShadowmereFetcher.ShadowmereProxy>>(emptyList()) }
-    var countries by remember { mutableStateOf<List<String>>(emptyList()) }
-    var totalCount by remember { mutableIntStateOf(0) }
-    var isLoading by remember { mutableStateOf(false) }
+    var allCountries by remember { mutableStateOf<List<ShadowmereFetcher.CountryInfo>>(emptyList()) }
+    var proxyCounts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCountry by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
 
-    // Country code to name mapping
-    val countryCodeToName = remember(countries) {
-        mutableMapOf<String, String>()
-    }
-
+    // Load countries on startup
     LaunchedEffect(Unit) {
         isLoading = true
-        val result = ShadowmereFetcher.fetchProxies(pageSize = 200)
-        isLoading = false
-        if (result.isSuccess) {
-            proxies = result.proxies
-            totalCount = result.totalCount
-            countries = result.countries
+        try {
+            val countries = ShadowmereFetcher.fetchCountryCodes()
+            allCountries = countries
             errorMessage = null
-        } else {
-            errorMessage = result.error
+
+            // Fetch proxy counts in background
+            scope.launch {
+                try {
+                    val counts = ShadowmereFetcher.fetchProxyCountByCountry()
+                    proxyCounts = counts
+                } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            errorMessage = e.localizedMessage ?: "خطا"
         }
+        isLoading = false
     }
 
     Column(
@@ -100,7 +92,7 @@ fun ShadowmereScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "$totalCount پروکسی فعال از ${countries.size} کشور",
+                        text = "${allCountries.size} کشور فعال",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
@@ -144,13 +136,13 @@ fun ShadowmereScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = CyanPrimary, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("در حال دریافت پروکسی‌ها...", color = TextSecondary)
+                    Text("در حال دریافت لیست کشورها...", color = TextSecondary)
                 }
             }
         }
 
         // Error
-        if (errorMessage != null) {
+        if (errorMessage != null && !isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -159,101 +151,88 @@ fun ShadowmereScreen(
                     Text("❌ خطا", color = Color.Red, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(errorMessage ?: "", color = TextSecondary, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = {
+                        scope.launch {
+                            isLoading = true
+                            errorMessage = null
+                            try {
+                                allCountries = ShadowmereFetcher.fetchCountryCodes()
+                            } catch (e: Exception) {
+                                errorMessage = e.localizedMessage
+                            }
+                            isLoading = false
+                        }
+                    }) {
+                        Text("تلاش مجدد")
+                    }
                 }
             }
         }
 
         // Country List
         if (!isLoading && errorMessage == null) {
-            val filteredProxies = proxies.filter { proxy ->
+            val filtered = allCountries.filter { country ->
                 searchQuery.isBlank() ||
-                proxy.country.contains(searchQuery, ignoreCase = true) ||
-                proxy.location.contains(searchQuery, ignoreCase = true) ||
-                proxy.countryCode.contains(searchQuery, ignoreCase = true)
+                country.name.contains(searchQuery, ignoreCase = true) ||
+                country.code.contains(searchQuery, ignoreCase = true)
             }
-
-            // Group by country
-            val grouped = filteredProxies.groupBy { it.country }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // All countries button
-                item {
+                items(filtered.size) { index ->
+                    val country = filtered[index]
+                    val proxyCount = proxyCounts[country.code] ?: 0
+                    val flag = COUNTRY_FLAGS[country.code] ?: "🏳️"
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                selectedCountry = ""
-                                scope.launch {
-                                    isLoading = true
-                                    val result = ShadowmereFetcher.fetchProxies(pageSize = 200)
-                                    isLoading = false
-                                    if (result.isSuccess) {
-                                        proxies = result.proxies
-                                        totalCount = result.totalCount
-                                    }
-                                }
+                                onFetchProxies(country.code)
                             },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (selectedCountry.isEmpty()) CyanPrimary.copy(alpha = 0.2f) else DarkBgMain
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = DarkBgMain),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("🌍", fontSize = 24.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("همه کشورها", fontWeight = FontWeight.Bold, color = Color.White)
-                                Text("$totalCount پروکسی فعال", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                            }
-                            if (selectedCountry.isEmpty()) {
-                                Text("✓", color = CyanPrimary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                // Country items
-                grouped.forEach { (country, countryProxies) ->
-                    item {
-                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    selectedCountry = country
-                                    proxies = countryProxies
-                                },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (selectedCountry == country) EmeraldAccent.copy(alpha = 0.2f) else DarkBgMain
-                            ),
-                            shape = RoundedCornerShape(12.dp)
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            // Flag
+                            Text(flag, fontSize = 28.sp)
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Country name and count
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = country.name,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = if (proxyCount > 0) "$proxyCount پروکسی فعال" else country.code,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                            }
+
+                            // Download button
+                            Button(
+                                onClick = { onFetchProxies(country.code) },
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
-                                val countryCode = countryProxies.firstOrNull()?.countryCode ?: ""
-                                Text(COUNTRY_FLAGS[countryCode] ?: "🏳️", fontSize = 28.sp)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(country, fontWeight = FontWeight.Bold, color = Color.White)
-                                    Text("${countryProxies.size} پروکسی", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                                }
-                                Button(
-                                    onClick = { onFetchProxies(countryCode) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldAccent),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("دریافت", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("دریافت", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
