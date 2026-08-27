@@ -377,4 +377,53 @@ class ProxyRepository(private val db: AppDatabase) {
 
         Pair(addedConfigs, addedProxies)
     }
+
+    /**
+     * دریافت کانفیگ‌ها از منابع GitHub رایگان (بدون VPN)
+     */
+    suspend fun fetchFromGitHubSources(
+        onProgress: (ScanProgress) -> Unit
+    ): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        val sources = ChannelFetcher.FREE_GITHUB_SOURCES
+        var totalNewConfigs = 0
+        var totalNewProxies = 0
+
+        sources.forEachIndexed { index, source ->
+            onProgress(
+                ScanProgress(
+                    isScanning = true,
+                    currentChannel = "GitHub: ${source.name}",
+                    totalChannels = sources.size,
+                    currentChannelIndex = index + 1,
+                    configsFound = totalNewConfigs,
+                    proxiesFound = totalNewProxies
+                )
+            )
+
+            val result = ChannelFetcher.fetchGitHubSource(source)
+            if (result.isSuccess) {
+                if (result.configs.isNotEmpty()) {
+                    val inserted = db.configDao().insertConfigs(result.configs)
+                    totalNewConfigs += inserted.count { it != -1L }
+                }
+                if (result.proxies.isNotEmpty()) {
+                    val inserted = db.proxyDao().insertProxies(result.proxies)
+                    totalNewProxies += inserted.count { it != -1L }
+                }
+            }
+        }
+
+        onProgress(
+            ScanProgress(
+                isScanning = false,
+                currentChannel = "",
+                totalChannels = sources.size,
+                currentChannelIndex = sources.size,
+                configsFound = totalNewConfigs,
+                proxiesFound = totalNewProxies
+            )
+        )
+
+        Pair(totalNewConfigs, totalNewProxies)
+    }
 }

@@ -23,8 +23,47 @@ import javax.net.ssl.X509TrustManager
 object ChannelFetcher {
 
     // Cloudflare Worker URL - بدون فیلتر کار می‌کنه
-    // اگر Worker خودتون دارید آدرسش رو اینجا عوض کنید
     private const val WORKER_URL = "https://proxyhub-worker.sasa200000.workers.dev"
+
+    // منابع رایگان GitHub - بدون VPN قابل دسترس!
+    val FREE_GITHUB_SOURCES = listOf(
+        GitHubSource(
+            name = "V2Ray Config (Barry)",
+            url = "https://raw.githubusercontent.com/barry-far/V2ray-config/main/Sub1.txt",
+            description = "بیش از ۱۰۰۰ کانفیگ V2Ray - آپدیت هر ۱۵ دقیقه"
+        ),
+        GitHubSource(
+            name = "Free V2Ray Public List",
+            url = "https://raw.githubusercontent.com/ebrasha/free-v2ray-public-list/refs/heads/main/all_extracted_configs.txt",
+            description = "لیست کانفیگ‌های رایگان VLESS/VMess/Trojan/SS"
+        ),
+        GitHubSource(
+            name = "0xRadikal Free Configs",
+            url = "https://raw.githubusercontent.com/0xRadikal/Free-v2ray-Configs/main/Sub1.txt",
+            description = "کانفیگ‌های رایگان تست‌شده - VLESS/VMess/Trojan"
+        ),
+        GitHubSource(
+            name = "Port-Based Configs",
+            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/All/All.txt",
+            description = "بیش از ۱۱۰۰۰ کانفیگ بر اساس پورت"
+        ),
+        GitHubSource(
+            name = "Epodonios Configs",
+            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt",
+            description = "کانفیگ‌های رایگان V2Ray - آپدیت هر ۵ دقیقه"
+        ),
+        GitHubSource(
+            name = "MatinGhanbari Configs",
+            url = "https://raw.githubusercontent.com/MatinGhanbari/v2ray-configs/main/sub_list/All_Configs_Sub.txt",
+            description = "کانفیگ‌های V2Ray رایگان - آپدیت هر ۱۵ دقیقه"
+        )
+    )
+
+    data class GitHubSource(
+        val name: String,
+        val url: String,
+        val description: String
+    )
 
     private var currentProxyConfig: ProxyConfig? = null
     private var cachedClient: OkHttpClient? = null
@@ -97,10 +136,76 @@ object ChannelFetcher {
         return clean
     }
 
+    /**
+     * دریافت کانفیگ‌ها از یک منبع GitHub
+     * این روش بدون VPN کار می‌کنه!
+     */
+    suspend fun fetchGitHubSource(source: GitHubSource): FetchResult = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(source.url)
+                .header("User-Agent", "v2rayNG/1.8.19")
+                .header("Accept", "*/*")
+                .build()
+
+            val response = getClient().newCall(request).execute()
+            response.use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext FetchResult(
+                        username = source.name, title = source.name,
+                        description = source.description,
+                        configs = emptyList(), proxies = emptyList(),
+                        isSuccess = false, error = "خطای HTTP: ${resp.code}"
+                    )
+                }
+
+                val content = resp.body?.string() ?: ""
+                if (content.isBlank()) {
+                    return@withContext FetchResult(
+                        username = source.name, title = source.name,
+                        description = source.description,
+                        configs = emptyList(), proxies = emptyList(),
+                        isSuccess = false, error = "محتوای خالی"
+                    )
+                }
+
+                val parseResult = ConfigParser.extractAll(content, sourceChannel = source.name)
+                return@withContext FetchResult(
+                    username = source.name,
+                    title = source.name,
+                    description = source.description,
+                    configs = parseResult.configs,
+                    proxies = parseResult.proxies,
+                    isSuccess = true
+                )
+            }
+        } catch (e: Exception) {
+            return@withContext FetchResult(
+                username = source.name, title = source.name,
+                description = source.description,
+                configs = emptyList(), proxies = emptyList(),
+                isSuccess = false, error = e.localizedMessage ?: "خطا"
+            )
+        }
+    }
+
+    /**
+     * دریافت از تمام منابع GitHub رایگان
+     * @return لیست نتایج هر منبع
+     */
+    suspend fun fetchAllGitHubSources(): List<FetchResult> {
+        val results = mutableListOf<FetchResult>()
+        for (source in FREE_GITHUB_SOURCES) {
+            val result = fetchGitHubSource(source)
+            results.add(result)
+        }
+        return results
+    }
+
     suspend fun fetchChannel(rawInput: String): FetchResult = withContext(Dispatchers.IO) {
         val cleanInput = rawInput.trim()
 
-        // Direct URL subscription
+        // Direct URL subscription (GitHub raw, subscription links, etc)
         if (cleanInput.startsWith("http://") || cleanInput.startsWith("https://")) {
             if (!cleanInput.contains("t.me")) {
                 return@withContext fetchDirectUrl(cleanInput)
@@ -111,14 +216,13 @@ object ChannelFetcher {
         if (username.isBlank()) {
             return@withContext FetchResult(
                 username = "", title = "", description = "",
-                configs = emptyList(), proxies = emptyList(),
-                isSuccess = false, error = "نام کانال نامعتبر است"
+                configs = emptyList(), proxies = emptyList(), isSuccess = false, error = "نام کانال نامعتبر است"
             )
         }
 
-        // اول از Worker (بدون فیلتر) استفاده کن
         var lastError: String? = null
 
+        // اول از Worker (بدون فیلتر) استفاده کن
         try {
             val workerResult = fetchViaWorker(username)
             if (workerResult.isSuccess) {
@@ -174,9 +278,6 @@ object ChannelFetcher {
         )
     }
 
-    /**
-     * دریافت از طریق Cloudflare Worker (بدون فیلتر)
-     */
     private fun fetchViaWorker(username: String): FetchResult {
         val url = "$WORKER_URL/api/channel/$username"
         val request = Request.Builder()
@@ -220,7 +321,7 @@ object ChannelFetcher {
 
     private suspend fun fetchDirectUrl(url: String): FetchResult = withContext(Dispatchers.IO) {
         try {
-            // اول از Worker استفاده کن
+            // اول تلاش از Worker
             val workerUrl = "$WORKER_URL/api/fetch?url=${java.net.URLEncoder.encode(url, "UTF-8")}"
             val request = Request.Builder()
                 .url(workerUrl)

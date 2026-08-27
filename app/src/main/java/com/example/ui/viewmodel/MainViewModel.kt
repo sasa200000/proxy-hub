@@ -267,6 +267,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * دریافت کانفیگ‌ها از منابع GitHub رایگان (بدون VPN)
+     */
+    fun fetchFromGitHub() {
+        if (_scanProgress.value.isScanning) return
+        viewModelScope.launch {
+            val result = repository.fetchFromGitHubSources { progress ->
+                _scanProgress.value = progress
+            }
+            _toastEvent.emit("دریافت از GitHub انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
+        }
+    }
+
     // Config Actions
     fun testAllConfigs() {
         if (_configTestProgress.value.isTesting) return

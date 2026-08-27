@@ -20,8 +20,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tag
@@ -135,6 +137,24 @@ fun ChannelsScreen(
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(if (scanProgress.isScanning) "در حال دریافت..." else "دریافت از کانال‌ها", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { viewModel.fetchFromGitHub() },
+                        enabled = !scanProgress.isScanning,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("fetch_github_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B9D), contentColor = Color.White),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (scanProgress.isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Icon(imageVector = Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("دریافت از GitHub", fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
