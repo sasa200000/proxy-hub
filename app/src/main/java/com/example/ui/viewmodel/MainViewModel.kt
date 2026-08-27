@@ -204,6 +204,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentTab.value = tab
     }
 
+    // Shadowmere state
+    private val _showShadowmere = MutableStateFlow(false)
+    val showShadowmere: StateFlow<Boolean> = _showShadowmere.asStateFlow()
+
+    fun setShowShadowmere(show: Boolean) {
+        _showShadowmere.value = show
+    }
+
+    /**
+     * دریافت پروکسی‌های Shadowmere بر اساس کشور
+     */
+    fun fetchShadowmereByCountry(countryCode: String) {
+        if (_scanProgress.value.isScanning) return
+        viewModelScope.launch {
+            try {
+                val result = com.example.data.fetcher.ShadowmereFetcher.fetchProxies(
+                    countryCode = countryCode,
+                    pageSize = 100
+                )
+                if (result.isSuccess) {
+                    var addedConfigs = 0
+                    var addedProxies = 0
+                    for (proxy in result.proxies) {
+                        if (proxy.url.isNotBlank() && proxy.isActive) {
+                            val configResult = repository.extractAndSaveRawText(proxy.url, "Shadowmere:${proxy.country}")
+                            addedConfigs += configResult.first
+                            addedProxies += configResult.second
+                        }
+                    }
+                    val countryName = result.proxies.firstOrNull()?.country ?: countryCode
+                    _toastEvent.emit("دریافت از $countryName: $addedConfigs کانفیگ و $addedProxies پروکسی جدید")
+                } else {
+                    _toastEvent.emit("خطا: ${result.error}")
+                }
+            } catch (e: Exception) {
+                _toastEvent.emit("خطا: ${e.localizedMessage}")
+            }
+        }
+    }
+
     fun setConfigSearchQuery(query: String) {
         _configSearchQuery.value = query
     }
@@ -277,6 +317,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _scanProgress.value = progress
             }
             _toastEvent.emit("دریافت از GitHub انجام شد: ${result.first} کانفیگ و ${result.second} پروکسی جدید اضافه شد")
+        }
+    }
+
+    /**
+     * دریافت پروکسی‌های Shadowmere از سایت shadowmere.xyz
+     */
+    fun fetchFromShadowmere() {
+        if (_scanProgress.value.isScanning) return
+        viewModelScope.launch {
+            try {
+                val result = com.example.data.fetcher.ShadowmereFetcher.fetchProxies(pageSize = 100)
+                if (result.isSuccess) {
+                    var addedProxies = 0
+                    var addedConfigs = 0
+                    for (proxy in result.proxies) {
+                        if (proxy.url.isNotBlank() && proxy.isActive) {
+                            // Shadowmere returns ss:// URIs - parse as configs
+                            val configResult = repository.extractAndSaveRawText(proxy.url, "Shadowmere:${proxy.country}")
+                            addedConfigs += configResult.first
+                            addedProxies += configResult.second
+                        }
+                    }
+                    _toastEvent.emit("دریافت از Shadowmere: ${result.proxies.size} پروکسی (${result.totalCount} کل) از ${result.countries.size} کشور")
+                } else {
+                    _toastEvent.emit("خطا: ${result.error}")
+                }
+            } catch (e: Exception) {
+                _toastEvent.emit("خطا در دریافت از Shadowmere: ${e.localizedMessage}")
+            }
         }
     }
 

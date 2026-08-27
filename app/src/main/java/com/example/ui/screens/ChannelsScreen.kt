@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.ui.graphics.Color
@@ -75,6 +76,7 @@ import com.example.ui.viewmodel.MainViewModel
 @Composable
 fun ChannelsScreen(
     viewModel: MainViewModel,
+    onOpenShadowmere: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val channels by viewModel.allChannels.collectAsStateWithLifecycle()
@@ -155,6 +157,24 @@ fun ChannelsScreen(
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("دریافت از GitHub", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { onOpenShadowmere() },
+                        enabled = !scanProgress.isScanning,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("fetch_shadowmere_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50), contentColor = Color.White),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (scanProgress.isScanning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Icon(imageVector = Icons.Default.Public, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("دریافت از Shadowmere", fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(

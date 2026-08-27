@@ -76,6 +76,7 @@ fun MainScreen(
     val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
     val configTestProgress by viewModel.configTestProgress.collectAsStateWithLifecycle()
     val proxyTestProgress by viewModel.proxyTestProgress.collectAsStateWithLifecycle()
+    val showShadowmere by viewModel.showShadowmere.collectAsStateWithLifecycle()
 
     val aliveConfigsCount by viewModel.aliveConfigsCount.collectAsStateWithLifecycle()
     val aliveProxiesCount by viewModel.aliveProxiesCount.collectAsStateWithLifecycle()
@@ -269,7 +270,22 @@ fun MainScreen(
                 when (tab) {
                     AppTab.CONFIGS -> ConfigsScreen(viewModel = viewModel)
                     AppTab.PROXIES -> ProxiesScreen(viewModel = viewModel)
-                    AppTab.CHANNELS -> ChannelsScreen(viewModel = viewModel)
+                    AppTab.CHANNELS -> {
+                        if (showShadowmere) {
+                            ShadowmereScreen(
+                                onBack = { viewModel.setShowShadowmere(false) },
+                                onFetchProxies = { countryCode ->
+                                    viewModel.fetchShadowmereByCountry(countryCode)
+                                    viewModel.setShowShadowmere(false)
+                                }
+                            )
+                        } else {
+                            ChannelsScreen(
+                                viewModel = viewModel,
+                                onOpenShadowmere = { viewModel.setShowShadowmere(true) }
+                            )
+                        }
+                    }
                     AppTab.TOOLS -> ToolsScreen(viewModel = viewModel)
                 }
             }
