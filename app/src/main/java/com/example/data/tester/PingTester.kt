@@ -1,21 +1,30 @@
 package com.example.data.tester
 
+import com.example.data.model.ProxyConfig
+import com.example.data.model.ProxyProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 object PingTester {
+
+    private var proxyConfig: ProxyConfig? = null
+
+    fun updateProxy(config: ProxyConfig?) {
+        proxyConfig = config
+    }
 
     data class PingResult(
         val isAlive: Boolean,
         val pingMs: Long
     )
 
-    /**
-     * Tests TCP connectivity and latency (in milliseconds) to target host:port.
-     * Returns PingResult with accurate latency or -2 if unreachable/dead.
-     */
     suspend fun testTcpPing(
         host: String,
         port: Int,
@@ -30,6 +39,7 @@ object PingTester {
             val startTime = System.nanoTime()
             socket = Socket()
             socket.soTimeout = timeoutMs
+
             val socketAddress = InetSocketAddress(host, port)
             socket.connect(socketAddress, timeoutMs)
 

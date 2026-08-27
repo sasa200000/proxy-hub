@@ -18,11 +18,15 @@ import com.example.data.model.ChannelEntity
 import com.example.data.model.ConfigEntity
 import com.example.data.model.FilterStatus
 import com.example.data.model.ProtocolType
+import com.example.data.model.ProxyConfig
 import com.example.data.model.ProxyEntity
+import com.example.data.model.ProxyProtocol
 import com.example.data.model.ProxyType
 import com.example.data.model.ScanProgress
 import com.example.data.model.TestProgress
 import com.example.data.repository.ProxyRepository
+import com.example.data.fetcher.ChannelFetcher
+import com.example.data.tester.PingTester
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -89,6 +93,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _concurrency = MutableStateFlow(12)
     val concurrency: StateFlow<Int> = _concurrency.asStateFlow()
+
+    // Proxy Settings
+    private val _proxyConfig = MutableStateFlow(com.example.data.model.ProxySettings.load(application))
+    val proxyConfig: StateFlow<com.example.data.model.ProxyConfig> = _proxyConfig.asStateFlow()
 
     // Snackbar / Toast events
     private val _toastEvent = MutableSharedFlow<String>()
@@ -168,6 +176,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             repository.initDefaultChannelsIfNeeded()
+        }
+        // Apply saved proxy config
+        applyProxyConfig(_proxyConfig.value)
+    }
+
+    fun setProxyConfig(config: com.example.data.model.ProxyConfig) {
+        _proxyConfig.value = config
+        com.example.data.model.ProxySettings.save(getApplication(), config)
+        applyProxyConfig(config)
+        viewModelScope.launch {
+            _toastEvent.emit("تنظیمات پروکسی ذخیره شد")
+        }
+    }
+
+    private fun applyProxyConfig(config: com.example.data.model.ProxyConfig) {
+        if (config.enabled && config.host.isNotBlank()) {
+            ChannelFetcher.updateProxy(config)
+            PingTester.updateProxy(config)
+        } else {
+            ChannelFetcher.updateProxy(null)
+            PingTester.updateProxy(null)
         }
     }
 

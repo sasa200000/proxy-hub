@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
@@ -37,9 +38,12 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.ProxyConfig
+import com.example.data.model.ProxyProtocol
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.DarkBgMain
 import com.example.ui.theme.DarkBorder
@@ -74,6 +80,7 @@ fun ToolsScreen(
     val clipboardManager = LocalClipboardManager.current
     val pingTimeout by viewModel.pingTimeoutMs.collectAsStateWithLifecycle()
     val concurrency by viewModel.concurrency.collectAsStateWithLifecycle()
+    val proxyConfig by viewModel.proxyConfig.collectAsStateWithLifecycle()
 
     var manualText by remember { mutableStateOf("") }
 
@@ -85,6 +92,12 @@ fun ToolsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Section 0: Proxy Settings
+        ProxySettingsCard(
+            proxyConfig = proxyConfig,
+            onSave = { viewModel.setProxyConfig(it) }
+        )
+
         // Section 1: Manual Extractor
         Card(
             modifier = Modifier.fillMaxWidth().testTag("manual_extractor_card"),
@@ -218,7 +231,6 @@ fun ToolsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { viewModel.copyAllAliveConfigs(context) },
@@ -312,7 +324,6 @@ fun ToolsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
-
                 // Timeout Slider
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -336,7 +347,6 @@ fun ToolsScreen(
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
-
                 // Concurrency Slider
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -419,5 +429,182 @@ fun ToolsScreen(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+    }
+}
+
+@Composable
+fun ProxySettingsCard(
+    proxyConfig: ProxyConfig,
+    onSave: (ProxyConfig) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var enabled by remember { mutableStateOf(proxyConfig.enabled) }
+    var host by remember { mutableStateOf(proxyConfig.host) }
+    var portText by remember { mutableStateOf(proxyConfig.port.toString()) }
+    var selectedType by remember { mutableIntStateOf(
+        when (proxyConfig.type) {
+            ProxyProtocol.SOCKS5 -> 0
+            ProxyProtocol.HTTP -> 1
+            ProxyProtocol.HTTPS -> 2
+        }
+    ) }
+
+    Card(
+        modifier = modifier.fillMaxWidth().testTag("proxy_settings_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurfaceCard),
+        border = androidx.compose.foundation.BorderStroke(1.dp, CyanPrimary.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.NetworkCheck,
+                        contentDescription = null,
+                        tint = CyanPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "تنظیمات پروکسی",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "برای عبور از فیلتر، آدرس پروکسی VPN خود را وارد کنید",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { enabled = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = DarkBgMain,
+                        checkedTrackColor = CyanPrimary,
+                        uncheckedThumbColor = TextMuted,
+                        uncheckedTrackColor = DarkSurfaceElevated
+                    ),
+                    modifier = Modifier.testTag("proxy_enabled_switch")
+                )
+            }
+
+            if (enabled) {
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Proxy Type Selection
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val types = listOf("SOCKS5", "HTTP", "HTTPS")
+                    types.forEachIndexed { index, label ->
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(2.dp),
+                            color = if (selectedType == index) CyanPrimary.copy(alpha = 0.2f) else DarkSurfaceElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (selectedType == index) CyanPrimary else DarkBorder
+                            )
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selectedType == index) CyanPrimary else TextSecondary,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (selectedType == index) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .padding(1.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Host
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    modifier = Modifier.fillMaxWidth().testTag("proxy_host_input"),
+                    label = { Text("آدرس سرور پروکسی", color = TextSecondary) },
+                    placeholder = { Text("مثال: 127.0.0.1", color = TextMuted, fontSize = 13.sp) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = DarkSurfaceElevated,
+                        unfocusedContainerColor = DarkSurfaceElevated,
+                        focusedBorderColor = CyanPrimary,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Port
+                OutlinedTextField(
+                    value = portText,
+                    onValueChange = { portText = it.filter { c -> c.isDigit() } },
+                    modifier = Modifier.fillMaxWidth().testTag("proxy_port_input"),
+                    label = { Text("پورت", color = TextSecondary) },
+                    placeholder = { Text("1080", color = TextMuted, fontSize = 13.sp) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = DarkSurfaceElevated,
+                        unfocusedContainerColor = DarkSurfaceElevated,
+                        focusedBorderColor = CyanPrimary,
+                        unfocusedBorderColor = DarkBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Save Button
+                Button(
+                    onClick = {
+                        val port = portText.toIntOrNull() ?: 1080
+                        val type = when (selectedType) {
+                            0 -> ProxyProtocol.SOCKS5
+                            1 -> ProxyProtocol.HTTP
+                            else -> ProxyProtocol.HTTPS
+                        }
+                        onSave(ProxyConfig(enabled = true, type = type, host = host.trim(), port = port))
+                    },
+                    enabled = host.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().testTag("save_proxy_btn"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary, contentColor = DarkBgMain)
+                ) {
+                    Text("ذخیره تنظیمات پروکسی", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "💡 مثال: اگر از v2rayNG استفاده می‌کنید، پورت SOCKS5 معمولاً 10808 و HTTP معمولاً 10809 است",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted,
+                    lineHeight = 16.sp
+                )
+            }
+        }
     }
 }

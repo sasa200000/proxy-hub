@@ -1,12 +1,16 @@
 package com.example.data.fetcher
 
 import com.example.data.model.ConfigEntity
+import com.example.data.model.ProxyConfig
 import com.example.data.model.ProxyEntity
+import com.example.data.model.ProxyProtocol
 import com.example.data.parser.ConfigParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
@@ -17,8 +21,15 @@ import javax.net.ssl.X509TrustManager
 
 object ChannelFetcher {
 
-    private val client: OkHttpClient = run {
-        // Trust all certificates to work with VPN/proxy SSL interception
+    private var currentProxyConfig: ProxyConfig? = null
+    private var cachedClient: OkHttpClient? = null
+
+    fun updateProxy(proxyConfig: ProxyConfig?) {
+        currentProxyConfig = proxyConfig
+        cachedClient = null // Force rebuild
+    }
+
+    private fun buildClient(proxyConfig: ProxyConfig?): OkHttpClient {
         val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
             override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
             override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
@@ -28,7 +39,7 @@ object ChannelFetcher {
         val sslContext = SSLContext.getInstance("TLS")
         sslContext.init(null, trustAllCerts, SecureRandom())
 
-        OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
@@ -36,7 +47,24 @@ object ChannelFetcher {
             .followSslRedirects(true)
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier { _, _ -> true }
-            .build()
+
+        // Apply proxy if configured
+        if (proxyConfig != null && proxyConfig.enabled && proxyConfig.host.isNotBlank()) {
+            val javaProxy = when (proxyConfig.type) {
+                ProxyProtocol.SOCKS5 -> Proxy(Proxy.Type.SOCKS, InetSocketAddress(proxyConfig.host, proxyConfig.port))
+                ProxyProtocol.HTTP, ProxyProtocol.HTTPS -> Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyConfig.host, proxyConfig.port))
+            }
+            builder.proxy(javaProxy)
+        }
+
+        return builder.build()
+    }
+
+    private fun getClient(): OkHttpClient {
+        if (cachedClient == null) {
+            cachedClient = buildClient(currentProxyConfig)
+        }
+        return cachedClient!!
     }
 
     data class FetchResult(
@@ -49,9 +77,6 @@ object ChannelFetcher {
         val error: String? = null
     )
 
-    /**
-     * Cleans username input (e.g., "@channel", "https://t.me/s/channel", "https://t.me/channel" -> "channel")
-     */
     fun sanitizeChannelInput(input: String): String {
         var clean = input.trim()
         clean = clean.replace("https://t.me/s/", "")
@@ -68,13 +93,9 @@ object ChannelFetcher {
         return clean
     }
 
-    /**
-     * Fetches public posts from a Telegram Channel or direct subscription URL.
-     */
     suspend fun fetchChannel(rawInput: String): FetchResult = withContext(Dispatchers.IO) {
         val cleanInput = rawInput.trim()
 
-        // Check if it's a direct full URL (e.g. raw subscription or pastebin link)
         if (cleanInput.startsWith("http://") || cleanInput.startsWith("https://")) {
             if (!cleanInput.contains("t.me")) {
                 return@withContext fetchDirectUrl(cleanInput)
@@ -94,7 +115,6 @@ object ChannelFetcher {
             )
         }
 
-        // Try multiple URLs with retry logic
         val urls = listOf(
             "https://t.me/s/$username",
             "https://t.me/$username"
@@ -113,7 +133,7 @@ object ChannelFetcher {
                     .header("Connection", "keep-alive")
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                getClient().newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         lastError = "خطای دریافت: کد ${response.code}"
                         continue
@@ -127,7 +147,6 @@ object ChannelFetcher {
 
                     val title = extractTitle(html).ifBlank { "@$username" }
                     val description = extractDescription(html)
-
                     val parseResult = ConfigParser.extractAll(html, sourceChannel = username)
 
                     return@withContext FetchResult(
@@ -165,7 +184,7 @@ object ChannelFetcher {
                 .header("Connection", "keep-alive")
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            getClient().newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     return@withContext FetchResult(
                         username = "sub",
