@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets
 object ConfigParser {
 
     private val CONFIG_REGEX = Regex("""(?i)(?:vless|vmess|trojan|ss|hysteria2|hy2|tuic|wireguard)://[^\s<>"'\r\n)\]}]+""")
-    private val PROXY_REGEX = Regex("""(?i)(?:tg://(?:proxy|socks)\?[^\s<>"'\r\n)\]}]+|https?://t\.me/(?:proxy|socks)\?[^\s<>"'\r\n)\]}]+|socks5://[^\s<>"'\r\n)\]}]+)""")
+    private val PROXY_REGEX = Regex("""(?i)(?:tg://(?:proxy|socks)\?[^\s<>"'\r\n)\]}]+|https?://t\.me/(?:proxy|socks)\?[^\s<>"'\r\n)\]}]+|socks5?://[^\s<>"'\r\n)\]}]+|https?://[^\s<>"'\r\n)\]}+#[^\s<>"'\r\n)\]}]+)""")
 
     data class ParseResult(
         val configs: List<ConfigEntity>,
@@ -280,34 +280,117 @@ object ConfigParser {
                 }
             }
 
-            val server = queryParams["server"] ?: queryParams["ip"] ?: ""
-            val portStr = queryParams["port"]
-            val port = portStr?.toIntOrNull() ?: 443
-            val secret = queryParams["secret"] ?: ""
-            val user = queryParams["user"] ?: ""
-            val pass = queryParams["pass"] ?: ""
+            // tg:// proxy/socks format
+            if (uri.startsWith("tg://", ignoreCase = true)) {
+                val server = queryParams["server"] ?: queryParams["ip"] ?: ""
+                val portStr = queryParams["port"]
+                val port = portStr?.toIntOrNull() ?: 443
+                val secret = queryParams["secret"] ?: ""
+                val user = queryParams["user"] ?: ""
+                val pass = queryParams["pass"] ?: ""
 
-            val type = if (uri.contains("socks", ignoreCase = true)) ProxyType.SOCKS5 else ProxyType.MTPROTO
+                val type = if (uri.contains("socks", ignoreCase = true)) ProxyType.SOCKS5 else ProxyType.MTPROTO
 
-            if (server.isNotBlank() && port > 0) {
-                val canonicalUri = if (type == ProxyType.MTPROTO) {
-                    "tg://proxy?server=$server&port=$port&secret=$secret"
-                } else {
-                    if (user.isNotBlank()) "tg://socks?server=$server&port=$port&user=$user&pass=$pass"
-                    else "tg://socks?server=$server&port=$port"
+                if (server.isNotBlank() && port > 0) {
+                    val canonicalUri = if (type == ProxyType.MTPROTO) {
+                        "tg://proxy?server=$server&port=$port&secret=$secret"
+                    } else {
+                        if (user.isNotBlank()) "tg://socks?server=$server&port=$port&user=$user&pass=$pass"
+                        else "tg://socks?server=$server&port=$port"
+                    }
+
+                    return ProxyEntity(
+                        rawUri = canonicalUri,
+                        type = type,
+                        server = server,
+                        port = port,
+                        secret = secret,
+                        username = user,
+                        password = pass,
+                        sourceChannel = sourceChannel
+                    )
                 }
+                return null
+            }
 
-                ProxyEntity(
-                    rawUri = canonicalUri,
-                    type = type,
-                    server = server,
-                    port = port,
-                    secret = secret,
-                    username = user,
-                    password = pass,
-                    sourceChannel = sourceChannel
-                )
-            } else null
+            // t.me proxy/socks format
+            if (uri.contains("t.me", ignoreCase = true)) {
+                val server = queryParams["server"] ?: queryParams["ip"] ?: ""
+                val portStr = queryParams["port"]
+                val port = portStr?.toIntOrNull() ?: 443
+                val secret = queryParams["secret"] ?: ""
+                val user = queryParams["user"] ?: ""
+                val pass = queryParams["pass"] ?: ""
+
+                val type = if (uri.contains("socks", ignoreCase = true)) ProxyType.SOCKS5 else ProxyType.MTPROTO
+
+                if (server.isNotBlank() && port > 0) {
+                    return ProxyEntity(
+                        rawUri = uri,
+                        type = type,
+                        server = server,
+                        port = port,
+                        secret = secret,
+                        username = user,
+                        password = pass,
+                        sourceChannel = sourceChannel
+                    )
+                }
+                return null
+            }
+
+            // socks5:// format
+            if (uri.startsWith("socks5://", ignoreCase = true) || uri.startsWith("socks://", ignoreCase = true)) {
+                val noProto = uri.substringAfter("://")
+                val atIdx = noProto.lastIndexOf("@")
+                val hostPort = if (atIdx != -1) noProto.substring(atIdx + 1) else noProto
+                val hp = hostPort.split(":")
+                val host = hp[0].trim()
+                val port = hp.getOrNull(1)?.toIntOrNull() ?: 1080
+                val userPass = if (atIdx != -1) noProto.substring(0, atIdx) else ""
+                val user = if (userPass.contains(":")) userPass.substringBefore(":") else ""
+                val pass = if (userPass.contains(":")) userPass.substringAfter(":") else ""
+
+                if (host.isNotBlank() && port > 0) {
+                    return ProxyEntity(
+                        rawUri = uri,
+                        type = ProxyType.SOCKS5,
+                        server = host,
+                        port = port,
+                        secret = "",
+                        username = user,
+                        password = pass,
+                        sourceChannel = sourceChannel
+                    )
+                }
+                return null
+            }
+
+            // http:// or https:// proxy format
+            if (uri.startsWith("http://", ignoreCase = true) || uri.startsWith("https://", ignoreCase = true)) {
+                val noProto = uri.substringAfter("://")
+                val hashIdx = noProto.indexOf('#')
+                val hostPort = if (hashIdx != -1) noProto.substring(0, hashIdx) else noProto
+                val hp = hostPort.split(":")
+                val host = hp[0].trim()
+                val port = hp.getOrNull(1)?.toIntOrNull() ?: if (uri.startsWith("https")) 443 else 80
+
+                if (host.isNotBlank() && port > 0) {
+                    return ProxyEntity(
+                        rawUri = uri,
+                        type = ProxyType.SOCKS5,
+                        server = host,
+                        port = port,
+                        secret = "",
+                        username = "",
+                        password = "",
+                        sourceChannel = sourceChannel
+                    )
+                }
+                return null
+            }
+
+            null
         } catch (e: Exception) {
             null
         }
