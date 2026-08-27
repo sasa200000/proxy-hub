@@ -52,7 +52,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         application,
         AppDatabase::class.java,
         "proxy_hub.db"
-    ).build()
+    ).fallbackToDestructiveMigration()
+        .build()
 
     private val repository = ProxyRepository(db)
 
