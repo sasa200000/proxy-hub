@@ -43,19 +43,44 @@ object ChannelFetcher {
             description = "کانفیگ‌های رایگان تست‌شده - VLESS/VMess/Trojan"
         ),
         GitHubSource(
-            name = "Port-Based Configs",
-            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/All/All.txt",
-            description = "بیش از ۱۱۰۰۰ کانفیگ بر اساس پورت"
+            name = "Port 80 Configs",
+            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/Port/80/Sub.txt",
+            description = "کانفیگ‌های پورت 80"
         ),
         GitHubSource(
-            name = "Epodonios Configs",
-            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/All_Configs_Sub.txt",
-            description = "کانفیگ‌های رایگان V2Ray - آپدیت هر ۵ دقیقه"
+            name = "Port 2053 Configs",
+            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/Port/2053/Sub.txt",
+            description = "کانفیگ‌های پورت 2053"
         ),
         GitHubSource(
-            name = "MatinGhanbari Configs",
-            url = "https://raw.githubusercontent.com/MatinGhanbari/v2ray-configs/main/sub_list/All_Configs_Sub.txt",
-            description = "کانفیگ‌های V2Ray رایگان - آپدیت هر ۱۵ دقیقه"
+            name = "Port 8080 Configs",
+            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/Port/8880/Sub.txt",
+            description = "کانفیگ‌های پورت 8880"
+        ),
+        GitHubSource(
+            name = "Port 8443 Configs",
+            url = "https://raw.githubusercontent.com/hamedcode/port-based-v2ray-configs/main/Subs/Port/8443/Sub.txt",
+            description = "کانفیگ‌های پورت 8443"
+        ),
+        GitHubSource(
+            name = "Epodonios VLESS",
+            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/VLess_Sub.txt",
+            description = "کانفیگ‌های VLESS رایگان"
+        ),
+        GitHubSource(
+            name = "Epodonios VMess",
+            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/VMess_Sub.txt",
+            description = "کانفیگ‌های VMess رایگان"
+        ),
+        GitHubSource(
+            name = "Epodonios Trojan",
+            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/Trojan_Sub.txt",
+            description = "کانفیگ‌های Trojan رایگان"
+        ),
+        GitHubSource(
+            name = "Epodonios SS",
+            url = "https://raw.githubusercontent.com/Epodonios/v2ray-configs/main/Splitted-By-Protocol/Shadowsocks_Sub.txt",
+            description = "کانفیگ‌های Shadowsocks رایگان"
         )
     )
 
