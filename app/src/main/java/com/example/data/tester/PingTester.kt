@@ -67,10 +67,10 @@ object PingTester {
                     val sslContext = javax.net.ssl.SSLContext.getInstance("TLS")
                     sslContext.init(null, trustAll, java.security.SecureRandom())
 
-                    val factory = sslContext.socketFactory as SSLSocketFactory
                     val tlsStartTime = System.nanoTime()
-                    val sslSocket = factory.createSocket(socket, host, port) as SSLSocket
+                    val sslSocket = (sslContext.socketFactory as javax.net.ssl.SSLSocketFactory).createSocket() as javax.net.ssl.SSLSocket
                     sslSocket.soTimeout = timeoutMs
+                    sslSocket.connect(InetSocketAddress(host, port), timeoutMs)
                     sslSocket.startHandshake()
                     val elapsedTls = (System.nanoTime() - tlsStartTime) / 1_000_000
                     sslSocket.close()
