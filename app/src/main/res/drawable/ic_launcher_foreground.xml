@@ -1,8 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="72dp"
-        android:height="72dp"
-        android:drawable="@drawable/app_icon_proxy_1787636901453"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background circle -->
+    <path
+        android:fillColor="#FF1A1A2E"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    <!-- Shield shape -->
+    <path
+        android:fillColor="#FF00E5FF"
+        android:fillAlpha="0.15"
+        android:pathData="M54,28L30,38v16c0,14.4 10.24,27.84 24,31c13.76,-3.16 24,-16.6 24,-31v-16L54,28z" />
+    <path
+        android:strokeColor="#FF00E5FF"
+        android:strokeWidth="2"
+        android:pathData="M54,28L30,38v16c0,14.4 10.24,27.84 24,31c13.76,-3.16 24,-16.6 24,-31v-16L54,28z" />
+    <!-- Lightning bolt -->
+    <path
+        android:fillColor="#FFFF4081"
+        android:pathData="M56,40L46,58h6l-2,14l12,-18h-6l2,-14z" />
+    <!-- Small dots -->
+    <path
+        android:fillColor="#FFFF4081"
+        android:pathData="M40,52m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+    <path
+        android:fillColor="#FFFF4081"
+        android:pathData="M68,52m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+    <!-- Speed lines -->
+    <path
+        android:strokeColor="#FFFF4081"
+        android:strokeWidth="1.5"
+        android:pathData="M34,46L26,46" />
+    <path
+        android:strokeColor="#FFFF4081"
+        android:strokeWidth="1.5"
+        android:pathData="M82,46L74,46" />
+    <path
+        android:strokeColor="#FFFF4081"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.5"
+        android:pathData="M36,60L30,60" />
+    <path
+        android:strokeColor="#FFFF4081"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.5"
+        android:pathData="M78,60L72,60" />
+</vector>
