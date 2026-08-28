@@ -175,9 +175,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val deadProxiesCount = repository.deadProxiesCount.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     init {
-        viewModelScope.launch {
-            repository.initDefaultChannelsIfNeeded()
-        }
         // Apply saved proxy config
         applyProxyConfig(_proxyConfig.value)
     }
